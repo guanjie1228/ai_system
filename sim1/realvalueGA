@@ -1,0 +1,48 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# RVGA 參數
+pop_size, gen, c_r, m_r = 10, 100, 0.8, 0.01
+S = 1.0 # 突變幅度
+
+def fitness(x):
+    return -15 * np.sin(2*x)**2 - (x - 2)**2 + 160
+
+# 初始族群
+pop = np.random.uniform(-10, 10, size=pop_size)
+max_f, avg_f = [], []
+
+for _ in range(gen):
+    f = fitness(pop)
+    max_f.append(f.max())
+    avg_f.append(f.mean())
+
+    # reproduction
+    probs = f / f.sum()
+    repro = np.random.choice(pop_size, size=pop_size, p=probs)
+    m = pop[repro]
+
+    # crossover
+    a = m.copy()
+    for i in range(0, pop_size, 2):
+        if np.random.rand() < c_r:
+            x1, x2 = m[i], m[i + 1]
+            sigma = np.random.uniform(-1, 1)
+            a[i]   = x1 + sigma * (x1 - x2)
+            a[i + 1] = x2 - sigma * (x1 - x2)
+
+    # mutation
+    for i in range(pop_size):
+        if np.random.rand() < m_r:
+            a[i] += S * np.random.uniform(-1, 1)
+
+    # 限制範圍 [-10,10]
+    pop = np.clip(a, -10, 10)
+
+plt.plot(max_f, label='Max fitness', linestyle='--')
+plt.plot(avg_f, label='Average fitness')
+plt.xlabel('Generation')
+plt.ylabel('Fitness')
+plt.legend(loc='best')
+plt.tight_layout()
+plt.show()
