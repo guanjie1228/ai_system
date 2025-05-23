@@ -1,0 +1,51 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# BGA 參數
+pop_size, x_bit, gen, c_r, m_r = 10, 10, 1000, 0.8, 0.01
+
+# 二進位映射到實數-10~10
+def decode(x):
+    y = x.dot(2 ** np.arange(x_bit)[::-1]) # 2進位是最前面數字最大，所以要反向
+    return -10 + 20 * (y /  ((2 ** x_bit) - 1))
+
+# 適應函數
+def fitness(x):
+    return -15 * np.sin(2 * x) ** 2 - (x - 2) ** 2 + 160
+
+# 初始族群
+pop = np.random.randint(0, 2, (pop_size, x_bit))
+max_f, avg_f = [], []
+
+for i in range(gen):
+    x = decode(pop)
+    f = fitness(x)
+    max_f.append(f.max())
+    avg_f.append(f.mean())
+
+    # reproduction
+    probs = f / f.sum()
+    repro = np.random.choice(pop_size, size=pop_size, p=probs) # 指定範圍、機率，選擇指定大小的陣列。
+    m = pop[repro]
+
+    # crossover
+    a = m.copy()
+    for i in range(0, pop_size, 2):
+        if np.random.rand() < c_r:
+            cp = np.random.randint(1, x_bit) # 隨機產生交配點
+            # 父母 i 的前半段（從 0 到 cp-1）+ 父母 i+1 的後半段（從 cp 到末尾）
+            a[i] = np.r_[m[i, :cp], m[i + 1, cp:]]
+            a[i + 1] = np.r_[m[i + 1, :cp], m[i, cp:]]
+
+    # mutation
+    mask = np.random.rand(pop_size, x_bit) < m_r
+    # 會在對應的mask為True的位置取1 - off（執行突變）
+    pop = np.where(mask, 1 - a, a)
+
+plt.plot(max_f, label='Max fitness', linestyle='--')
+plt.plot(avg_f, label='Average fitness')
+plt.xlabel('Generation')
+plt.ylabel('Fitness')
+plt.legend(loc='best')
+plt.tight_layout()
+plt.show()
