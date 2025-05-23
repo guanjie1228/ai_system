@@ -1,0 +1,182 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def tri_mf(x, a, b, c):
+    return np.maximum(np.minimum((x - a) / (b - a ), (c - x) / (c - b )), 0)
+
+x_range = np.linspace(-4, 4, 200)  # 溫度 x
+y_range = np.linspace(0, 2, 200)  # 重量 y
+z_range = np.linspace(0, 10, 200)  # 時間 z
+w_range = np.linspace(600, 1200, 200)  # 功率 w
+
+x_low = tri_mf(x_range, -4, -4, 0)
+x_med = tri_mf(x_range, -3, 0, 3)
+x_high = tri_mf(x_range, 0, 4, 4)
+y_light = tri_mf(y_range, 0, 0, 1)
+y_med = tri_mf(y_range, 0, 1, 2)
+y_heavy = tri_mf(y_range, 1, 2, 2)
+z_short = tri_mf(z_range, 0, 0, 5)
+z_med = tri_mf(z_range, 0, 5, 10)
+z_long = tri_mf(z_range, 5, 10, 10)
+w_low = tri_mf(w_range, 600, 600, 800)
+w_med = tri_mf(w_range, 700, 900, 1100)
+w_high = tri_mf(w_range, 1000, 1200, 1200)
+
+fig1, axs = plt.subplots(2, 2)
+
+axs[0, 0].plot(x_range, x_low, label="low", color='blue')
+axs[0, 0].plot(x_range, x_med, label="medium", color='green')
+axs[0, 0].plot(x_range, x_high, label="high", color='red')
+axs[0, 0].set_title("Temperature (x)")
+axs[0, 0].legend()
+axs[0, 0].grid(True)
+
+axs[0, 1].plot(y_range, y_light, label="light", color='blue')
+axs[0, 1].plot(y_range, y_med, label="medium", color='green')
+axs[0, 1].plot(y_range, y_heavy, label="heavy", color='red')
+axs[0, 1].set_title("Weight (y)")
+axs[0, 1].legend()
+axs[0, 1].grid(True)
+
+axs[1, 0].plot(z_range, z_short, label="short", color='blue')
+axs[1, 0].plot(z_range, z_med, label="medium", color='green')
+axs[1, 0].plot(z_range, z_long, label="long", color='red')
+axs[1, 0].set_title("Time (z)")
+axs[1, 0].legend()
+axs[1, 0].grid(True)
+
+axs[1, 1].plot(w_range, w_low, label="low", color='blue')
+axs[1, 1].plot(w_range, w_med, label="medium", color='green')
+axs[1, 1].plot(w_range, w_high, label="high", color='red')
+axs[1, 1].set_title("Power (w)")
+axs[1, 1].legend()
+axs[1, 1].grid(True)
+plt.tight_layout()
+plt.show()
+
+def tri_mf_2(x, a, b, c):
+    if a == b and x <= a:
+        return 1.0
+    if b == c and x >= c:
+        return 1.0
+    if x <= a or x >= c:
+        return 0.0
+    elif x <= b:
+        return (x - a) / ((b - a) + 1e-6)
+    else:
+        return (c - x) / ((c - b) + 1e-6)
+
+def df_z(x, y): # z的解模糊化
+    mu_x_low = tri_mf_2(x, -4, -4, 0)
+    mu_x_med = tri_mf_2(x, -3, 0, 3)
+    mu_x_high = tri_mf_2(x, 0, 4, 4)
+
+    mu_y_light = tri_mf_2(y, 0, 0, 1)
+    mu_y_med = tri_mf_2(y, 0, 1, 2)
+    mu_y_heavy = tri_mf_2(y, 1, 2, 2)
+
+    alpha_short = 0.0
+    alpha_med = 0.0
+    alpha_long = 0.0
+
+    # 規則：每條規則根據 x 與 y 的隸屬度取最小值（代表“and”運算），再與已知值取最大值（代表多條規則之間的“or”運算）。
+    alpha_long = max(alpha_long, min(mu_x_low, mu_y_heavy))
+    alpha_med = max(alpha_med, min(mu_x_low, mu_y_med))
+    alpha_short = max(alpha_short, min(mu_x_low, mu_y_light))
+
+    alpha_long = max(alpha_long, min(mu_x_med, mu_y_heavy))
+    alpha_med = max(alpha_med, min(mu_x_med, mu_y_med))
+    alpha_short = max(alpha_short, min(mu_x_med, mu_y_light))
+
+    alpha_long = max(alpha_long, min(mu_x_high, mu_y_heavy))
+    alpha_med = max(alpha_med, min(mu_x_high, mu_y_med))
+    alpha_short = max(alpha_short, min(mu_x_high, mu_y_light))
+
+    center_short = 0
+    center_med = 5
+    center_long = 10
+
+    uc_short = min(alpha_short, tri_mf_2(center_short, 0, 0, 5))
+    uc_med = min(alpha_med, tri_mf_2(center_med, 0, 5, 10))
+    uc_long = min(alpha_long, tri_mf_2(center_long, 5, 10, 10))
+
+    numerator = (center_short * uc_short
+                 + center_med * uc_med
+                 + center_long * uc_long)
+    denominator = (uc_short + uc_med + uc_long)
+
+    if denominator == 0:
+        return 0.0
+    else:
+        return numerator / denominator
+
+def df_w(x, y):
+    mu_x_low = tri_mf_2(x, -4, -4, 0)
+    mu_x_med = tri_mf_2(x, -3, 0, 3)
+    mu_x_high = tri_mf_2(x, 0, 4, 4)
+
+    mu_y_light = tri_mf_2(y, 0, 0, 1)
+    mu_y_med = tri_mf_2(y, 0, 1, 2)
+    mu_y_heavy = tri_mf_2(y, 1, 2, 2)
+
+    alpha_low = 0.0
+    alpha_med = 0.0
+    alpha_high = 0.0
+
+    alpha_high = max(alpha_high, min(mu_x_low, mu_y_heavy))
+    alpha_high = max(alpha_high, min(mu_x_low, mu_y_med))
+    alpha_high = max(alpha_high, min(mu_x_low, mu_y_light))
+
+    alpha_med = max(alpha_med, min(mu_x_med, mu_y_heavy))
+    alpha_med = max(alpha_med, min(mu_x_med, mu_y_med))
+    alpha_med = max(alpha_med, min(mu_x_med, mu_y_light))
+
+    alpha_low = max(alpha_low, min(mu_x_high, mu_y_heavy))
+    alpha_low = max(alpha_low, min(mu_x_high, mu_y_med))
+    alpha_low = max(alpha_low, min(mu_x_high, mu_y_light))
+
+    center_short = 0
+    center_med = 5
+    center_long = 10
+
+    uc_short = min(alpha_low, tri_mf_2(center_short, 0, 0, 5))
+    uc_med = min(alpha_med, tri_mf_2(center_med, 0, 5, 10))
+    uc_long = min(alpha_high, tri_mf_2(center_long, 5, 10, 10))
+
+    numerator = (center_short * uc_short
+                 + center_med * uc_med
+                 + center_long * uc_long)
+    denominator = (uc_short + uc_med + uc_long)
+
+    if denominator == 0:
+        return 0.0
+    else:
+        return numerator / denominator
+
+X, Y = np.meshgrid(x_range, y_range)
+Z = np.zeros_like(X)
+W = np.zeros_like(X)
+
+for i in range(X.shape[0]):
+    for j in range(X.shape[1]):
+        Z[i, j] = df_z(X[i, j], Y[i, j])
+        W[i, j] = df_w(X[i, j], Y[i, j])
+
+fig2 = plt.figure()
+
+ax3 = fig2.add_subplot(1, 2, 1, projection='3d')
+surf1 = ax3.plot_surface(X, Y, Z, cmap='viridis')
+ax3.set_title('Time(z)')
+ax3.set_xlabel('Temperature (x)')
+ax3.set_ylabel('Weight (y)')
+ax3.set_zlabel('Time (z)')
+
+ax4 = fig2.add_subplot(1, 2, 2, projection='3d')
+surf2 = ax4.plot_surface(X, Y, W, cmap='viridis')
+ax4.set_title('power(w)')
+ax4.set_xlabel('Temperature (x)')
+ax4.set_ylabel('Weight (y)')
+ax4.set_zlabel('Power (w)')
+
+plt.tight_layout()
+plt.show()
